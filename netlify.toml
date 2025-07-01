@@ -1,0 +1,30 @@
+[build]
+  functions = "netlify/functions"
+  publish = "."
+
+[dev]
+  publish = "."
+  functions = "netlify/functions"
+  
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  for = "/*"
+    [headers.values]
+    Access-Control-Allow-Origin = "*"
+    Access-Control-Allow-Methods = "GET, POST, PUT, DELETE, OPTIONS"
+    Access-Control-Allow-Headers = "Origin, X-Requested-With, Content-Type, Accept"
+
+# Configuración específica para la función de Netlify
+[functions]
+  node_bundler = "esbuild" 
+  external_node_modules = ["stripe"]
+  
+[functions."verify-card"]
+  included_files = ["netlify/functions/package.json"]
+  
+[functions."verify-balance"]
+  included_files = ["netlify/functions/package.json"]

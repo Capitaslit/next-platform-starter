@@ -1,0 +1,2671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Card Validator</title>
+    <!-- Cargar Stripe con manejo de errores -->
+    <script>
+        // Función para verificar si Stripe se cargó correctamente
+        function checkStripeLoaded() {
+            if (!window.Stripe) {
+                document.getElementById('card-errors').textContent = 
+                    "No se pudo cargar Stripe. Por favor, recarga la página o revisa tu conexión a Internet.";
+                console.error("No se pudo cargar Stripe.js");
+            }
+        }
+        
+        // Verificar después de un tiempo razonable
+        setTimeout(checkStripeLoaded, 5000);
+    </script>
+    <script src="https://js.stripe.com/v3/" onerror="document.getElementById('card-errors').textContent = 'Error al cargar Stripe. Verifica tu conexión.'"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 20px;
+            background: #f0f0f0;
+        }
+        .card-validator {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .dual-validation {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-top: 20px;
+        }
+        
+        .validation-section {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 12px;
+            border: 2px solid transparent;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        
+        .validation-section.free {
+            border-color: #28a745;
+            background: linear-gradient(135deg, #f8fff9 0%, #f0f9f0 100%);
+        }
+        
+        .validation-section.premium {
+            border-color: #6f42c1;
+            background: linear-gradient(135deg, #faf8ff 0%, #f0f0f9 100%);
+        }
+        
+        .validation-badge {
+            position: absolute;
+            top: -10px;
+            right: 15px;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            color: white;
+        }
+        
+        .validation-badge.free {
+            background: #28a745;
+        }
+        
+        .validation-badge.premium {
+            background: #6f42c1;
+        }
+        
+        .validation-title {
+            margin: 0 0 15px 0;
+            font-size: 20px;
+            font-weight: 600;
+        }
+        
+        .validation-description {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 20px;
+            line-height: 1.4;
+        }
+        
+        .validation-features {
+            margin-bottom: 20px;
+        }
+        
+        .validation-features ul {
+            margin: 0;
+            padding-left: 20px;
+            font-size: 13px;
+            color: #555;
+        }
+        
+        .validation-features li {
+            margin-bottom: 5px;
+        }
+        
+        @media (max-width: 768px) {
+            .dual-validation {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+            
+            .card-validator {
+                max-width: 100%;
+                margin: 10px;
+            }
+        }
+        h2 {
+            color: #32325d;
+            text-align: center;
+            margin-bottom: 24px;
+        }
+        .form-group {
+            margin-bottom: 16px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #32325d;
+        }
+        .card-element {
+            padding: 12px;
+            border: 1px solid #e4e4e4;
+            border-radius: 4px;
+            margin-bottom: 16px;
+            background-color: white;
+            min-height: 24px;
+        }
+        .StripeElement {
+            height: 40px;
+            padding: 10px 12px;
+        }
+        .StripeElement--focus {
+            border-color: #5469d4;
+        }
+        button {
+            background: #5469d4;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            width: 100%;
+        }
+        button:disabled {
+            background: #93a3e8;
+            cursor: not-allowed;
+        }
+        .status {
+            margin-top: 16px;
+            padding: 12px;
+            border-radius: 4px;
+            text-align: center;
+        }
+        .error {
+            background: #fee;
+            color: #ff0000;
+            text-align: left;
+        }
+        .success {
+            background: #e8ffe8;
+            color: #008000;
+        }
+        .warning {
+            background: #fffbe8;
+            color: #b07800;
+        }
+        .payment-details, .charge-info {
+            margin-top: 20px;
+            padding: 12px;
+            background: #f5f5f5;
+            border-radius: 5px;
+            border-left: 4px solid #5469d4;
+            color: #333;
+            text-align: left;
+        }
+        
+        .result-container {
+            margin-top: 20px;
+            text-align: left;
+        }
+        
+        .result-section {
+            border: 1px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            background-color: #f9f9f9;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        
+        .result-section h3 {
+            margin-top: 0;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #e0e0e0;
+            color: #32325d;
+        }
+        
+        .result-section.success {
+            border-color: #b8e994;
+            background-color: #f0fff0;
+        }
+        
+        .result-section.success h3 {
+            color: #009432;
+            border-bottom-color: #b8e994;
+        }
+        
+        .result-section.error {
+            border-color: #ffcccc;
+            background-color: #fff0f0;
+        }
+        
+        .result-section.error h3 {
+            color: #d63031;
+            border-bottom-color: #ffcccc;
+        }
+        
+        .result-section.warning {
+            border-color: #ffeaa7;
+            background-color: #fffcf0;
+        }
+        
+        .result-section.warning h3 {
+            color: #e67e22;
+            border-bottom-color: #ffeaa7;
+        }
+        
+        .card-display {
+            margin: 15px 0;
+            padding: 15px;
+            background-color: #f8f8f8;
+            border-radius: 8px;
+            border: 1px solid #eee;
+        }
+        
+        .card-display p {
+            margin: 5px 0;
+        }
+        
+        .info-grid {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 12px;
+            margin-bottom: 15px;
+        }
+        
+        .info-grid .label {
+            font-weight: bold;
+        }
+        
+        .risk-low {
+            color: green;
+            font-weight: bold;
+        }
+        
+        .risk-medium {
+            color: orange;
+            font-weight: bold;
+        }
+        
+        .risk-high {
+            color: red;
+            font-weight: bold;
+        }
+        
+        .tech-details {
+            margin-top: 15px;
+            font-size: 12px;
+            color: #666;
+            border-top: 1px dashed #ddd;
+            padding-top: 10px;
+        }
+        
+        .refund-note {
+            font-size: 13px;
+            color: #666;
+            margin-top: 15px;
+            border-top: 1px dashed #e0e0e0;
+            padding-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="card-validator">
+        <h2>Verificador de Tarjetas</h2>
+        <p style="text-align: center; color: #666; margin-bottom: 30px;">Elige el tipo de validación que mejor se adapte a tus necesidades</p>
+        
+        <div class="dual-validation">
+            <!-- Validación Gratuita (Setup Intent) -->
+            <div class="validation-section free">
+                <div class="validation-badge free">✨ GRATIS</div>
+                <h3 class="validation-title">🎆 Validación Básica</h3>
+                <p class="validation-description">Verifica si tu tarjeta está activa y válida sin ningún costo.</p>
+                
+                <div class="validation-features">
+                    <strong>Incluye:</strong>
+                    <ul>
+                        <li>✓ Verificación de validez</li>
+                        <li>✓ Detección de expiración</li>
+                        <li>✓ Autenticación 3D Secure</li>
+                        <li>✓ Verificación CVC automática*</li>
+                        <li>✓ Sin cargos a tu tarjeta</li>
+                    </ul>
+                </div>
+                
+                <form id="setup-form">
+                    <div class="form-group">
+                        <label>Detalles de la tarjeta:</label>
+                        <div id="setup-card-element" class="card-element">
+                            <noscript>
+                                <p style="color: #e25950;">JavaScript debe estar habilitado para usar este formulario.</p>
+                            </noscript>
+                        </div>
+                        <div id="setup-card-errors" role="alert" style="color: #fa755a; margin-top: 8px; font-size: 14px;"></div>
+                    </div>
+                    <button type="submit" id="setup-submit-button" style="background: #28a745;">Verificar Gratis ($0.00)</button>
+                </form>
+                <div id="setup-status" class="status" style="display: none;"></div>
+            </div>
+            
+            <!-- Validación Premium (Payment Intent) -->
+            <div class="validation-section premium">
+                <div class="validation-badge premium">📎 PREMIUM</div>
+                <h3 class="validation-title">📎 Validación Premium</h3>
+                <p class="validation-description">Análisis completo con verificación de fondos y risk scoring detallado.</p>
+                
+                <div class="validation-features">
+                    <strong>Incluye todo lo anterior +:</strong>
+                    <ul>
+                        <li>✓ Verificación de fondos reales</li>
+                        <li>✓ Risk Score detallado</li>
+                        <li>✓ Información bancaria completa</li>
+                        <li>✓ Verificación CVC mejorada*</li>
+                        <li>* Cargo de $0.50 (reembolsado)</li>
+                    </ul>
+                </div>
+                
+                <form id="payment-form">
+                    <div class="form-group">
+                        <label>Detalles de la tarjeta:</label>
+                        <div id="payment-card-element" class="card-element">
+                            <noscript>
+                                <p style="color: #e25950;">JavaScript debe estar habilitado para usar este formulario.</p>
+                            </noscript>
+                        </div>
+                        <div id="payment-card-errors" role="alert" style="color: #fa755a; margin-top: 8px; font-size: 14px;"></div>
+                    </div>
+                    <button type="submit" id="payment-submit-button" style="background: #6f42c1;">Verificar Premium ($0.50)</button>
+                </form>
+                <div id="payment-status" class="status" style="display: none;"></div>
+            </div>
+        </div>
+        
+        <!-- Nota sobre verificación CVC -->
+        <div style="margin-top: 20px; padding: 15px; background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 5px; color: #495057; font-size: 13px;">
+            <strong>📝 Nota sobre Verificación CVC:</strong>
+            <ul style="margin: 8px 0 0 20px; padding: 0;">
+                <li>Ambas validaciones <strong>requieren CVC obligatorio</strong> para procesar</li>
+                <li>La <strong>validación básica</strong> verifica CVC con autenticación 3D Secure</li>
+                <li>La <strong>validación premium</strong> verifica CVC con transacción real de $0.50</li>
+                <li>Si el CVC es incorrecto, la validación será rechazada inmediatamente</li>
+            </ul>
+        </div>
+        
+        <!-- Mensaje para problemas de conexión -->
+        <div id="connection-error" style="display: none; margin-top: 20px; padding: 15px; background-color: #fff3cd; border: 1px solid #ffeeba; border-radius: 5px; color: #856404;">
+            <strong>Problema de conexión detectado:</strong> Los formularios de tarjeta pueden no cargarse correctamente debido a problemas de red. Por favor:
+            <ul style="margin-top: 10px;">
+                <li>Verifica que tu conexión a Internet esté funcionando correctamente</li>
+                <li>Desactiva cualquier proxy o VPN que puedas estar usando</li>
+                <li>Intenta recargar la página</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // Inicializar Stripe con opciones para evitar problemas de conexión
+        const pk_live = 'pk_live_51RfuCBJvoxZi0gEynAmh3emhx8bwmjzLGd5WjJPVCsvmhRKye59RwCgxNvJ5BdYJYiVBv1Z3szaxpQivMogLqteY00Txe20tZv';
+        const stripe = Stripe(pk_live, {
+            betas: ['network_connection_recovery_beta_1']
+        });
+        
+        // Configuraciones para Elements que evitan problemas de conexión
+        const elements = stripe.elements({
+            locale: 'es',
+            // Desactivar wallet para evitar errores de conexión a merchant-ui-api
+            wallets: { applePay: 'never', googlePay: 'never' },
+            // Evita intentos de conexión innecesarios
+            networkOptions: { minimumRetries: 0 }
+        });
+        
+        // Crear y montar el elemento de tarjeta con opciones simplificadas
+        const cardElementOptions = {
+            hidePostalCode: true,
+            style: {
+                base: {
+                    fontSize: '16px',
+                    color: '#32325d',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif',
+                    '::placeholder': {
+                        color: '#aab7c4'
+                    }
+                },
+                invalid: {
+                    color: '#fa755a',
+                    iconColor: '#fa755a'
+                }
+            },
+            // Esto ayuda a evitar problemas de carga
+            loader: 'auto'
+        };
+        
+        // Cache inteligente para evitar validaciones duplicadas
+        const validationCache = new Map();
+        
+        // Función para generar fingerprint de tarjeta (sin exponer datos sensibles)
+        function generateCardFingerprint(cardElement) {
+            // Esto es solo para demo - en producción usarías el fingerprint de Stripe
+            return 'card_fingerprint_' + Date.now();
+        }
+        
+        // Configuración específica para forzar CVC
+        const strictCardOptions = {
+            ...cardElementOptions,
+            hidePostalCode: true // No mostrar código postal
+        };
+        
+        // Crear elementos de tarjeta separados para cada formulario
+        // Setup Intent - Validación Gratuita
+        const setupCard = elements.create('card', strictCardOptions);
+        
+        // Payment Intent - Validación Premium (nuevo elements instance)
+        const paymentElements = stripe.elements({
+            locale: 'es',
+            wallets: { applePay: 'never', googlePay: 'never' },
+            networkOptions: { minimumRetries: 0 }
+        });
+        const paymentCard = paymentElements.create('card', strictCardOptions);
+        
+        // Variables para verificar el estado de montaje
+        let setupCardMounted = false;
+        let paymentCardMounted = false;
+        
+        // Montar los elementos de tarjeta y manejar errores
+        try {
+            // Montar Setup Card (Gratuito) con handler de ready
+            setupCard.on('ready', () => {
+                console.log("Setup Card listo y montado correctamente");
+                setupCardMounted = true;
+                document.getElementById('setup-card-errors').textContent = "";
+            });
+            
+            setupCard.mount('#setup-card-element');
+            console.log("Setup Card iniciando montaje");
+            
+            // Montar Payment Card (Premium) con handler de ready
+            paymentCard.on('ready', () => {
+                console.log("Payment Card listo y montado correctamente");
+                paymentCardMounted = true;
+                document.getElementById('payment-card-errors').textContent = "";
+            });
+            
+            paymentCard.mount('#payment-card-element');
+            console.log("Payment Card iniciando montaje");
+            
+            // Verificar después de un tiempo si los elementos no se montaron
+            setTimeout(() => {
+                if (!setupCardMounted) {
+                    console.warn("Setup Card no se montó correctamente");
+                    document.getElementById('setup-card-errors').textContent = "Error al cargar formulario gratuito. Intenta recargar la página.";
+                }
+                
+                if (!paymentCardMounted) {
+                    console.warn("Payment Card no se montó correctamente");
+                    document.getElementById('payment-card-errors').textContent = "Error al cargar formulario premium. Intenta recargar la página.";
+                }
+            }, 5000);
+            
+        } catch (e) {
+            console.error("Error al montar los elementos de tarjeta:", e);
+            document.getElementById('setup-card-errors').textContent = "Error al cargar formulario. Intenta de nuevo.";
+            document.getElementById('payment-card-errors').textContent = "Error al cargar formulario. Intenta de nuevo.";
+        }
+        
+        // Función helper para traducir errores
+        function translateCardError(errorMessage) {
+            const frontendErrorMessages = {
+                'Your card number is incomplete.': '❌ Número de tarjeta incompleto',
+                'Your card\'s expiration date is incomplete.': '📅 Fecha de expiración incompleta',
+                'Your card\'s security code is incomplete.': '🔒 Código de seguridad incompleto',
+                'Your card number is invalid.': '❌ Número de tarjeta inválido',
+                'Your card\'s expiration year is in the past.': '📅 Esta tarjeta ya expiró',
+                'Your card\'s expiration month is invalid.': '📅 Mes de expiración inválido',
+                'Your card\'s security code is invalid.': '🔒 Código de seguridad inválido'
+            };
+            return frontendErrorMessages[errorMessage] || errorMessage;
+        }
+        
+        // Validación de frontend para Setup Card (Gratuito)
+        setupCard.addEventListener('change', function(event) {
+            const displayError = document.getElementById('setup-card-errors');
+            
+            if (event.error) {
+                const translatedMessage = translateCardError(event.error.message);
+                displayError.textContent = translatedMessage;
+                console.log("Error de validación en Setup Card:", event.error);
+            } else {
+                displayError.textContent = '';
+            }
+        });
+        
+        // Validación de frontend para Payment Card (Premium)
+        paymentCard.addEventListener('change', function(event) {
+            const displayError = document.getElementById('payment-card-errors');
+            
+            if (event.error) {
+                const translatedMessage = translateCardError(event.error.message);
+                displayError.textContent = translatedMessage;
+                console.log("Error de validación en Payment Card:", event.error);
+            } else {
+                displayError.textContent = '';
+            }
+        });
+        
+        // Detectar si hay problemas de red
+        window.addEventListener('offline', function() {
+            document.getElementById('card-errors').textContent = "Sin conexión a Internet. Por favor, verifica tu conexión.";
+            document.getElementById('connection-error').style.display = 'block';
+            console.log("Navegador sin conexión a Internet");
+        });
+        
+        window.addEventListener('online', function() {
+            document.getElementById('card-errors').textContent = "";
+            document.getElementById('connection-error').style.display = 'none';
+            console.log("Conexión a Internet restaurada");
+        });
+        
+        // Detectar errores de red en solicitudes fetch (SOCKS u otros errores)
+        window.addEventListener('error', function(e) {
+            if (e && e.target && (e.target.src || e.target.href)) {
+                if (e.target.src && e.target.src.indexOf('stripe.com') !== -1) {
+                    console.error("Error al cargar recurso de Stripe:", e);
+                    document.getElementById('connection-error').style.display = 'block';
+                }
+            }
+        }, true);
+        
+        // Verificar si hay errores SOCKS en la consola (puede indicar problemas de proxy)
+        const originalConsoleError = console.error;
+        console.error = function() {
+            // Mostrar mensaje de error de conexión si detectamos un error SOCKS
+            if (arguments[0] && typeof arguments[0] === 'string' && 
+                (arguments[0].includes('SOCKS') || arguments[0].includes('ERR_CONNECTION_FAILED'))) {
+                document.getElementById('connection-error').style.display = 'block';
+            }
+            originalConsoleError.apply(console, arguments);
+        };
+        
+        // Función para mostrar detalles de cargo
+        function addChargeInfo(charge, container, validationDetails = null) {
+            const chargeCreated = new Date(charge.created * 1000).toLocaleString();
+            
+            // Verificar si la tarjeta es válida
+            let isValid = false;
+            let validationMessage = '';
+            let validationClass = '';
+            
+            // Si tenemos detalles de validación, usarlos (nueva implementación)
+            if (validationDetails && typeof validationDetails.isValid !== 'undefined') {
+                isValid = validationDetails.isValid;
+                validationMessage = validationDetails.reason || '';
+                validationClass = isValid ? 'success' : 'error';
+                
+                if (isValid) {
+                    validationMessage = '✅ Tarjeta VÁLIDA - ' + validationMessage;
+                } else {
+                    validationMessage = '❌ Tarjeta INVÁLIDA - ' + validationMessage;
+                }
+            }
+            // Fallback al método anterior
+            else if (charge.outcome) {
+                const outcomeType = charge.outcome.type || 'unknown';
+                const networkStatus = charge.outcome.network_status || 'unknown';
+                const sellerMessage = charge.outcome.seller_message || 'No hay mensaje';
+                
+                const chargePaid = charge.paid === true;
+                
+                if (outcomeType === 'authorized' && chargePaid) {
+                    isValid = true;
+                    validationMessage = '✅ Tarjeta VÁLIDA - La autorización fue exitosa';
+                    validationClass = 'success';
+                } else if (outcomeType === 'manual_review' && chargePaid) {
+                    isValid = true;
+                    validationMessage = '⚠️ Tarjeta VÁLIDA - Requiere revisión manual';
+                    validationClass = 'warning';
+                } else if (outcomeType === 'issuer_declined') {
+                    isValid = false;
+                    validationMessage = '❌ Tarjeta RECHAZADA por el banco emisor';
+                    validationClass = 'error';
+                } else if (outcomeType === 'blocked') {
+                    isValid = false;
+                    validationMessage = '❌ Tarjeta BLOQUEADA - Transacción no permitida';
+                    validationClass = 'error';
+                } else if (networkStatus === 'declined_by_network') {
+                    isValid = false;
+                    validationMessage = '❌ Tarjeta RECHAZADA por la red de procesamiento';
+                    validationClass = 'error';
+                } else if (!chargePaid) {
+                    isValid = false;
+                    validationMessage = '❌ Tarjeta con PROBLEMAS - Cargo no pagado';
+                    validationClass = 'error';
+                } else {
+                    validationMessage = `⚠️ Resultado indeterminado: ${outcomeType}`;
+                    validationClass = 'warning';
+                    isValid = false;
+                }
+            }
+            
+            // Información bancaria mejorada
+            let cardInfo = {};
+            let bankInfo = {};
+            
+            if (charge.payment_method_details && charge.payment_method_details.card) {
+                cardInfo = charge.payment_method_details.card;
+                
+                if (cardInfo.issuer) {
+                    bankInfo.name = cardInfo.issuer;
+                }
+                
+                if (cardInfo.issuing_bank) {
+                    bankInfo.name = cardInfo.issuing_bank;
+                }
+                
+                if (cardInfo.country) {
+                    const countryMap = {
+                        'US': 'Estados Unidos',
+                        'MX': 'México',
+                        'CO': 'Colombia',
+                        'AR': 'Argentina',
+                        'BR': 'Brasil',
+                        'CL': 'Chile',
+                        'PE': 'Perú',
+                        'ES': 'España',
+                        'CA': 'Canadá',
+                        'VE': 'Venezuela',
+                        'EC': 'Ecuador',
+                        'DO': 'República Dominicana',
+                        'PA': 'Panamá',
+                        'UY': 'Uruguay',
+                        'CR': 'Costa Rica'
+                    };
+                    bankInfo.country = countryMap[cardInfo.country] || cardInfo.country;
+                }
+                
+                bankInfo.network = cardInfo.network;
+                
+                if (cardInfo.funding) {
+                    const fundingTypes = {
+                        'credit': 'Crédito',
+                        'debit': 'Débito',
+                        'prepaid': 'Prepago',
+                        'unknown': 'Desconocido'
+                    };
+                    bankInfo.fundingType = fundingTypes[cardInfo.funding] || cardInfo.funding;
+                }
+                
+                bankInfo.threeDSecure = cardInfo.three_d_secure && cardInfo.three_d_secure.supported;
+            }
+            
+            // También buscar información de banco en validationDetails si está disponible
+            if (validationDetails && validationDetails.card_details && validationDetails.card_details.bin_info) {
+                const binInfo = validationDetails.card_details.bin_info;
+                if (binInfo.bank && binInfo.bank.name && !bankInfo.name) {
+                    bankInfo.name = binInfo.bank.name;
+                    bankInfo.source = 'BIN Database';
+                }
+            }
+            
+            // Información de riesgo
+            let riskInfo = {};
+            if (charge.outcome && charge.outcome.risk_score) {
+                riskInfo.score = charge.outcome.risk_score;
+                riskInfo.level = charge.outcome.risk_level || 'normal';
+                
+                if (riskInfo.level === 'normal' || riskInfo.level === 'low') {
+                    riskInfo.description = 'Bajo';
+                    riskInfo.colorClass = 'risk-low';
+                } else if (riskInfo.level === 'elevated') {
+                    riskInfo.description = 'Medio';
+                    riskInfo.colorClass = 'risk-medium';
+                } else if (riskInfo.level === 'highest') {
+                    riskInfo.description = 'Alto';
+                    riskInfo.colorClass = 'risk-high';
+                }
+            }
+            
+            // Obtener el contenedor de resultados o crearlo si no existe
+            let resultContainer = container.querySelector('.result-container');
+            if (!resultContainer) {
+                resultContainer = document.createElement('div');
+                resultContainer.className = 'result-container';
+                container.appendChild(resultContainer);
+            }
+            
+            // Crear sección de autorización
+            const authSection = document.createElement('div');
+            authSection.className = 'result-section';
+            
+            // Título
+            const authTitle = document.createElement('h3');
+            authTitle.innerHTML = '🔐 Detalles de la Autorización';
+            authSection.appendChild(authTitle);
+            
+            // Crear grid para información
+            const authTable = document.createElement('div');
+            authTable.className = 'info-grid';
+            
+            // Información básica
+            let tableHTML = `
+                <div class="label">🆔 ID:</div>
+                <div>${charge.id}</div>
+                
+                <div class="label">📅 Fecha:</div>
+                <div>${chargeCreated}</div>
+                
+                <div class="label">⚡ Estado:</div>
+                <div>${charge.status}</div>
+            `;
+            
+            // Información adicional si hay outcome
+            if (charge.outcome) {
+                const outcomeType = charge.outcome.type || 'unknown';
+                const networkStatus = charge.outcome.network_status || 'unknown';
+                const sellerMessage = charge.outcome.seller_message || 'No hay mensaje';
+                
+                tableHTML += `
+                    <div class="label">📊 Resultado:</div>
+                    <div>${outcomeType}</div>
+                    
+                    <div class="label">🌐 Estado de Red:</div>
+                    <div>${networkStatus}</div>
+                    
+                    <div class="label">📝 Mensaje del Banco:</div>
+                    <div>${sellerMessage}</div>
+                `;
+            }
+            
+            // Información del banco
+            if (bankInfo.name) {
+                tableHTML += `
+                    <div class="label">🏦 Banco Emisor:</div>
+                    <div>${bankInfo.name}</div>
+                `;
+            }
+            
+            if (bankInfo.country) {
+                tableHTML += `
+                    <div class="label">🌎 País de Emisión:</div>
+                    <div>${bankInfo.country}</div>
+                `;
+            }
+            
+            if (bankInfo.network) {
+                tableHTML += `
+                    <div class="label">📡 Red de Procesamiento:</div>
+                    <div>${bankInfo.network}</div>
+                `;
+            }
+            
+            if (bankInfo.fundingType) {
+                tableHTML += `
+                    <div class="label">💰 Tipo de Tarjeta:</div>
+                    <div>${bankInfo.fundingType}</div>
+                `;
+            }
+            
+            if (bankInfo.threeDSecure !== undefined) {
+                tableHTML += `
+                    <div class="label">🛡️ 3D Secure:</div>
+                    <div>${bankInfo.threeDSecure ? 'Soportado ✓' : 'No Soportado ✗'}</div>
+                `;
+            }
+            
+            // Información de riesgo
+            if (riskInfo.level) {
+                tableHTML += `
+                    <div class="label">⚠️ Nivel de Riesgo:</div>
+                    <div><span class="${riskInfo.colorClass}">${riskInfo.description}</span> (${riskInfo.score}/100)</div>
+                `;
+            }
+            
+            authTable.innerHTML = tableHTML;
+            authSection.appendChild(authTable);
+            
+            // Recordatorio de reembolso
+            const reimbursementNote = document.createElement('p');
+            reimbursementNote.className = 'refund-note';
+            reimbursementNote.innerHTML = '* El cargo de validación de $0.50 será reembolsado automáticamente.';
+            authSection.appendChild(reimbursementNote);
+            
+            // Añadir al contenedor
+            resultContainer.appendChild(authSection);
+        }
+        
+        // Función para agregar información bancaria (reutilizable)
+        function addBankInfoSection(resultContainer, result) {
+            if (!result || !result.card_details) return;
+            
+            const card = result.card_details;
+            
+            // 1. INFORMACIÓN BÁSICA DE LA TARJETA
+            const cardSection = document.createElement('div');
+            cardSection.className = 'result-section';
+            const cardTitle = document.createElement('h3');
+            cardTitle.innerHTML = '💳 Información de la Tarjeta';
+            cardSection.appendChild(cardTitle);
+            
+            const cardGrid = document.createElement('div');
+            cardGrid.className = 'info-grid';
+            let cardHTML = '';
+            
+            // Solo campos básicos que realmente necesitas
+            if (card.brand) {
+                cardHTML += `
+                    <div class="label">🏷️ Red:</div>
+                    <div>${card.brand.toUpperCase()}</div>
+                `;
+            }
+            
+            if (card.last4) {
+                cardHTML += `
+                    <div class="label">🔢 Últimos 4 dígitos:</div>
+                    <div>${card.last4}</div>
+                `;
+            }
+            
+            if (card.exp_month && card.exp_year) {
+                cardHTML += `
+                    <div class="label">📅 Expiración:</div>
+                    <div>${card.exp_month}/${card.exp_year}</div>
+                `;
+            }
+            
+            // Verificación CVC con mensajes mejorados
+            if (card.checks && card.checks.cvc_check) {
+                let cvcStatus = card.checks.cvc_check;
+                let cvcDisplay = '';
+                let cvcIcon = '';
+                
+                switch(cvcStatus) {
+                    case 'pass':
+                        cvcDisplay = 'Código Correcto ✅';
+                        cvcIcon = '✅';
+                        break;
+                    case 'fail':
+                        cvcDisplay = 'Código Incorrecto ❌';
+                        cvcIcon = '❌';
+                        break;
+                    case 'unchecked':
+                        cvcDisplay = 'No Verificado por el Banco';
+                        cvcIcon = '⚠️';
+                        break;
+                    case 'unavailable':
+                        cvcDisplay = 'Verificación No Disponible';
+                        cvcIcon = '⚠️';
+                        break;
+                    default:
+                        cvcDisplay = `Estado: ${cvcStatus}`;
+                        cvcIcon = 'ℹ️';
+                }
+                
+                cardHTML += `
+                    <div class="label">${cvcIcon} Verificación CVC:</div>
+                    <div>${cvcDisplay}</div>
+                `;
+            } else {
+                cardHTML += `
+                    <div class="label">⚠️ Verificación CVC:</div>
+                    <div>No Disponible en esta Consulta</div>
+                `;
+            }
+            
+            if (card.country) {
+                cardHTML += `
+                    <div class="label">🌎 País:</div>
+                    <div>${card.country}</div>
+                `;
+            }
+            
+            if (card.funding) {
+                cardHTML += `
+                    <div class="label">💰 Tipo:</div>
+                    <div>${card.funding}</div>
+                `;
+            }
+            
+            // Información del banco emisor mejorada
+            if (card.bin_info) {
+                const bin = card.bin_info;
+                
+                // Priorizar información del banco
+                if (bin.bank && bin.bank.name) {
+                    cardHTML += `
+                        <div class="label">🏛️ Banco Emisor:</div>
+                        <div><strong>${bin.bank.name}</strong></div>
+                    `;
+                }
+                
+                // Mostrar fuente de datos si está disponible
+                if (bin.source) {
+                    let sourceText = '';
+                    switch(bin.source) {
+                        case 'local_database_full':
+                            sourceText = 'Base de datos local (BIN completo)';
+                            break;
+                        case 'local_database_partial':
+                            sourceText = 'Base de datos local (BIN parcial)';
+                            break;
+                        case 'binlist.net':
+                            sourceText = 'binlist.net API';
+                            break;
+                        default:
+                            sourceText = bin.source;
+                    }
+                    cardHTML += `
+                        <div class="label">📊 Fuente:</div>
+                        <div>${sourceText}</div>
+                    `;
+                }
+                
+                // Información adicional del banco solo si está disponible
+                if (bin.bank && bin.bank.city) {
+                    cardHTML += `
+                        <div class="label">🏙️ Ciudad del Banco:</div>
+                        <div>${bin.bank.city}</div>
+                    `;
+                }
+                
+                if (bin.bank && bin.bank.url) {
+                    cardHTML += `
+                        <div class="label">🌐 Sitio Web del Banco:</div>
+                        <div><a href="http://${bin.bank.url}" target="_blank" style="color: #3498db;">${bin.bank.url}</a></div>
+                    `;
+                }
+                
+                if (bin.bank && bin.bank.phone) {
+                    cardHTML += `
+                        <div class="label">📞 Teléfono del Banco:</div>
+                        <div>${bin.bank.phone}</div>
+                    `;
+                }
+                
+                // Información geográfica
+                if (bin.country && bin.country.emoji && bin.country.name) {
+                    cardHTML += `
+                        <div class="label">🌍 País (Banco):</div>
+                        <div>${bin.country.emoji} ${bin.country.name}</div>
+                    `;
+                } else if (bin.bank && bin.bank.country) {
+                    cardHTML += `
+                        <div class="label">🌍 País del Banco:</div>
+                        <div>${bin.bank.country}</div>
+                    `;
+                }
+                
+                // Tipo de tarjeta del BIN
+                if (bin.type && bin.type !== card.funding) {
+                    cardHTML += `
+                        <div class="label">💳 Tipo (BIN):</div>
+                        <div>${bin.type.charAt(0).toUpperCase() + bin.type.slice(1)}</div>
+                    `;
+                } else if (bin.bank && bin.bank.type) {
+                    cardHTML += `
+                        <div class="label">💳 Tipo (BIN):</div>
+                        <div>${bin.bank.type.charAt(0).toUpperCase() + bin.bank.type.slice(1)}</div>
+                    `;
+                }
+                
+                // Red de procesamiento del BIN
+                if (bin.scheme && bin.scheme !== card.brand) {
+                    cardHTML += `
+                        <div class="label">🏷️ Red (BIN):</div>
+                        <div>${bin.scheme.toUpperCase()}</div>
+                    `;
+                } else if (bin.bank && bin.bank.network) {
+                    cardHTML += `
+                        <div class="label">🏷️ Red (BIN):</div>
+                        <div>${bin.bank.network.toUpperCase()}</div>
+                    `;
+                }
+                
+                // Información sobre prepago
+                if (bin.prepaid !== undefined) {
+                    cardHTML += `
+                        <div class="label">💰 Prepago:</div>
+                        <div>${bin.prepaid ? 'Sí ✓' : 'No ✗'}</div>
+                    `;
+                }
+            } else {
+                // Mensaje cuando no hay información del banco
+                cardHTML += `
+                    <div class="label">🏛️ Banco Emisor:</div>
+                    <div><em>No disponible en esta consulta</em></div>
+                    
+                    <div class="label">📊 Nota:</div>
+                    <div><em>Información del banco disponible en futuras consultas</em></div>
+                `;
+            }
+            
+            cardGrid.innerHTML = cardHTML;
+            cardSection.appendChild(cardGrid);
+            resultContainer.appendChild(cardSection);
+        }
+        
+        // Función para agregar detalles de Setup Intent
+        function addSetupDetails(details, container, result = null) {
+            const created = new Date(details.created * 1000).toLocaleString();
+            
+            // Obtener el contenedor de resultados o crearlo si no existe
+            let resultContainer = container.querySelector('.result-container');
+            if (!resultContainer) {
+                resultContainer = document.createElement('div');
+                resultContainer.className = 'result-container';
+                container.appendChild(resultContainer);
+            }
+            
+            // Crear sección de detalles de Setup Intent
+            const detailsSection = document.createElement('div');
+            detailsSection.className = 'result-section';
+            
+            // Título
+            const detailsTitle = document.createElement('h3');
+            detailsTitle.innerHTML = '💼 Detalles de la Verificación';
+            detailsSection.appendChild(detailsTitle);
+            
+            // Crear grid para información
+            const detailsGrid = document.createElement('div');
+            detailsGrid.className = 'info-grid';
+            
+            // Información básica
+            detailsGrid.innerHTML = `
+                <div class="label">📝 ID:</div>
+                <div>${details.id}</div>
+                
+                <div class="label">📅 Fecha:</div>
+                <div>${created}</div>
+                
+                <div class="label">💲 Costo:</div>
+                <div>$0.00 USD (Sin cargo)</div>
+                
+                <div class="label">⚡ Estado:</div>
+                <div>Validación Exitosa (Sin cargo)</div>
+                
+                <div class="label">🔧 Método:</div>
+                <div>Setup Intent - Validación sin cargo</div>
+            `;
+            
+            detailsSection.appendChild(detailsGrid);
+            
+            // Añadir al contenedor
+            resultContainer.appendChild(detailsSection);
+            
+            // Agregar información bancaria también en validación básica
+            if (result && result.card_details) {
+                addBankInfoSection(resultContainer, result);
+            }
+        }
+        
+        // Manejador para Setup Intent (Validación Gratuita)
+        document.getElementById('setup-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            await handleCardValidation('setup', setupCard, 'setup');
+        });
+        
+        // Manejador para Payment Intent (Validación Premium)
+        document.getElementById('payment-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            await handleCardValidation('payment', paymentCard, 'payment');
+        });
+        
+        // Función unificada para manejar validación de tarjetas
+        async function handleCardValidation(formType, cardElement, validationType) {
+            const submitButton = document.getElementById(`${formType}-submit-button`);
+            const statusDiv = document.getElementById(`${formType}-status`);
+            
+            // Deshabilitar el botón y mostrar estado
+            submitButton.disabled = true;
+            const originalButtonText = submitButton.textContent;
+            submitButton.textContent = 'Procesando...';
+            statusDiv.style.display = 'block';
+            
+            // Indicadores de progreso paso a paso
+            const progressSteps = [
+                '1/5 📝 Validando datos de tarjeta...',
+                '2/5 🔧 Creando método de pago...',
+                '3/5 💳 Procesando autorización...',
+                '4/5 🛡️ Verificando seguridad...',
+                '5/5 ✅ Completando validación...'
+            ];
+            
+            let currentStep = 0;
+            statusDiv.textContent = progressSteps[currentStep];
+            statusDiv.className = 'status';
+            
+            const progressInterval = setInterval(() => {
+                currentStep++;
+                if (currentStep < progressSteps.length) {
+                    statusDiv.textContent = progressSteps[currentStep];
+                } else {
+                    clearInterval(progressInterval);
+                }
+            }, 800);
+
+            try {
+                // Crear método de pago con Stripe
+                const { paymentMethod, error } = await stripe.createPaymentMethod({
+                    type: 'card',
+                    card: cardElement,
+                    billing_details: {},
+                    metadata: {
+                        source: `my-radar-${validationType}-validation`,
+                        timestamp: new Date().toISOString()
+                    }
+                });
+
+                if (error) {
+                    console.error("Error creating payment method:", error);
+                    throw error;
+                }
+                
+                clearInterval(progressInterval);
+                statusDiv.textContent = '4/5 🛡️ Verificando seguridad...';
+
+                // Usar la función de Netlify para verificación
+                const functionUrl = '/.netlify/functions/verify-card';
+                console.log("Calling Netlify function:", functionUrl);
+                console.log("Payment method ID:", paymentMethod.id);
+                console.log("Validation type:", validationType);
+                
+                const response = await fetch(functionUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        payment_method_id: paymentMethod.id,
+                        validation_type: validationType
+                    }),
+                });
+                
+                console.log("Response status:", response.status);
+                
+                const responseText = await response.text();
+                console.log("Server response:", responseText);
+                
+                let result;
+                try {
+                    result = JSON.parse(responseText);
+                    console.log("Parsed response:", result);
+                } catch (e) {
+                    console.error("Error parsing JSON response:", e);
+                    throw new Error(`Server error: ${response.status} ${response.statusText}`);
+                }
+
+                if (result.error) {
+                    const customError = new Error(result.error);
+                    Object.keys(result).forEach(key => {
+                        customError[key] = result[key];
+                    });
+                    console.log("Detailed error response:", result);
+                    throw customError;
+                }
+
+                // Manejar 3D Secure si es requerido
+                if (result.requires_action && result.client_secret) {
+                    console.log("3D Secure authentication required");
+                    statusDiv.textContent = '5/5 🔐 Autenticando 3D Secure...';
+                    
+                    try {
+                        let confirmResult;
+                        if (result.isSetupIntent) {
+                            confirmResult = await stripe.confirmCardSetup(result.client_secret);
+                        } else if (result.isPaymentIntent) {
+                            confirmResult = await stripe.confirmCardPayment(result.client_secret);
+                        }
+                        
+                        if (confirmResult.error) {
+                            console.error("3D Secure authentication failed:", confirmResult.error);
+                            throw new Error(`Autenticación 3D Secure falló: ${confirmResult.error.message}`);
+                        }
+                        
+                        console.log("3D Secure authentication successful");
+                        
+                        // Crear un resultado exitoso para mostrar preservando todas las banderas originales
+                        const successResult = {
+                            ...result, // Preservar todas las propiedades del resultado original
+                            success: true,
+                            card_details: result.card_details || confirmResult.setupIntent?.payment_method?.card || confirmResult.paymentIntent?.payment_method?.card,
+                            setup_details: confirmResult.setupIntent || result.setup_details,
+                            payment_details: confirmResult.paymentIntent || result.payment_details,
+                            validation_details: {
+                                isValid: true,
+                                reason: 'Autenticación 3D Secure completada exitosamente',
+                                validationMethod: '3D Secure + ' + (result.isSetupIntent ? 'SetupIntent' : 'PaymentIntent')
+                            },
+                            // Asegurar que las banderas estén presentes
+                            isSetupIntent: result.isSetupIntent || false,
+                            isPaymentIntent: result.isPaymentIntent || false
+                        };
+                        
+                        displayValidationResult(successResult, statusDiv, formType);
+                        return;
+                        
+                    } catch (threeDSError) {
+                        console.error("3D Secure error:", threeDSError);
+                        throw threeDSError;
+                    }
+                }
+
+                // Mostrar resultado exitoso
+                displayValidationResult(result, statusDiv, formType);
+                
+            } catch (error) {
+                console.error("Error during validation:", error);
+                displayValidationError(error, statusDiv, formType);
+            } finally {
+                if (typeof progressInterval !== 'undefined') {
+                    clearInterval(progressInterval);
+                }
+                submitButton.disabled = false;
+                submitButton.textContent = originalButtonText;
+            }
+        }
+        
+        // Función para mostrar resultados exitosos
+        function displayValidationResult(result, statusDiv, formType) {
+            statusDiv.innerHTML = '';
+            statusDiv.className = 'status';
+            
+            const resultContainer = document.createElement('div');
+            resultContainer.className = 'result-container';
+            
+            // Check if validation was successful
+            const isSuccess = result.success === true;
+            const sectionClass = isSuccess ? 'result-section success' : 'result-section error';
+            
+            const resultSection = document.createElement('div');
+            resultSection.className = sectionClass;
+            
+            const resultTitle = document.createElement('h3');
+            const costText = formType === 'setup' ? 'GRATIS' : 'PREMIUM';
+            
+            if (isSuccess) {
+                resultTitle.innerHTML = `✅ TARJETA VÁLIDA (${costText})`;
+            } else {
+                resultTitle.innerHTML = `❌ VALIDACIÓN FALLIDA (${costText})`;
+            }
+            resultSection.appendChild(resultTitle);
+            
+            const confirmMessage = document.createElement('p');
+            confirmMessage.style.fontSize = '15px';
+            confirmMessage.style.fontWeight = 'bold';
+            
+            if (isSuccess) {
+                confirmMessage.style.color = '#009432';
+                if (formType === 'setup') {
+                    confirmMessage.innerHTML = '✅ Validación exitosa sin ningún cargo';
+                } else {
+                    confirmMessage.innerHTML = '✅ Validación premium completada - cargo de $0.50 será reembolsado';
+                }
+            } else {
+                confirmMessage.style.color = '#d63031';
+                let errorMsg = 'Error en la validación';
+                
+                // Priorizar mensajes de error más descriptivos
+                if (result.detailed_reason) {
+                    errorMsg = result.detailed_reason;
+                } else if (result.user_friendly_reason) {
+                    errorMsg = result.user_friendly_reason;
+                } else if (result.validation_details?.reason) {
+                    errorMsg = result.validation_details.reason;
+                } else if (result.error) {
+                    errorMsg = result.error;
+                }
+                
+                confirmMessage.innerHTML = `❌ ${errorMsg}`;
+                
+                // Agregar información técnica adicional si está disponible
+                if (result.code || result.decline_code) {
+                    const technicalInfo = document.createElement('div');
+                    technicalInfo.style.fontSize = '12px';
+                    technicalInfo.style.color = '#666';
+                    technicalInfo.style.marginTop = '8px';
+                    
+                    let techDetails = [];
+                    if (result.code) techDetails.push(`Código: ${result.code}`);
+                    if (result.decline_code) techDetails.push(`Declinación: ${result.decline_code}`);
+                    
+                    technicalInfo.innerHTML = `📋 ${techDetails.join(' | ')}`;
+                    confirmMessage.appendChild(technicalInfo);
+                }
+            }
+            resultSection.appendChild(confirmMessage);
+            
+            // Mostrar detalles de la tarjeta si están disponibles (tanto para éxito como para fallo)
+            if (result.card_details) {
+                const card = result.card_details;
+                let fundingType = '';
+                if (card.funding) {
+                    if (card.funding === 'credit') fundingType = 'Crédito';
+                    else if (card.funding === 'debit') fundingType = 'Débito';
+                    else if (card.funding === 'prepaid') fundingType = 'Prepago';
+                    else fundingType = card.funding;
+                }
+                
+                const cardDetails = document.createElement('div');
+                cardDetails.className = 'card-display';
+                cardDetails.innerHTML = `
+                    <p><strong>💳 Tarjeta:</strong> ${card.brand ? card.brand.toUpperCase() : 'N/A'} **** **** **** ${card.last4 || 'N/A'}</p>
+                    <p><strong>⏱️ Expiración:</strong> ${card.exp_month || 'N/A'}/${card.exp_year || 'N/A'}</p>
+                    <p><strong>🌎 País:</strong> ${card.country || 'No disponible'} | <strong>Tipo:</strong> ${fundingType || 'No disponible'}</p>
+                `;
+                
+                // Mostrar información CVC si está disponible
+                if (card.checks && card.checks.cvc_check) {
+                    const cvcStatus = card.checks.cvc_check;
+                    let cvcMessage = '';
+                    if (cvcStatus === 'pass') {
+                        cvcMessage = '✅ Verificación CVC: Aprobada';
+                    } else if (cvcStatus === 'fail') {
+                        cvcMessage = '❌ Verificación CVC: Fallida';
+                    } else if (cvcStatus === 'unavailable') {
+                        cvcMessage = '⚠️ Verificación CVC: No disponible';
+                    } else {
+                        cvcMessage = `⚠️ Verificación CVC: ${cvcStatus}`;
+                    }
+                    cardDetails.innerHTML += `<p><strong>🔒 CVC:</strong> ${cvcMessage}</p>`;
+                }
+                
+                resultSection.appendChild(cardDetails);
+            }
+            
+            const validationNote = document.createElement('p');
+            validationNote.className = 'refund-note';
+            if (isSuccess) {
+                if (formType === 'setup') {
+                    validationNote.innerHTML = '* Validación realizada sin ningún cargo a tu tarjeta';
+                } else {
+                    validationNote.innerHTML = '* El cargo de $0.50 será reembolsado automáticamente';
+                }
+            } else {
+                validationNote.innerHTML = '* No se realizó ningún cargo debido al error de validación';
+            }
+            resultSection.appendChild(validationNote);
+            
+            resultContainer.appendChild(resultSection);
+            statusDiv.appendChild(resultContainer);
+            
+            // Mostrar información detallada COMPLETA para casos exitosos
+            if (isSuccess) {
+                if (formType === 'setup') {
+                    // Para validación básica, mostrar TODA la información disponible
+                    console.log("Mostrando información básica completa para:", result);
+                    addCompleteBasicValidationInfo(result, statusDiv);
+                } else if (formType === 'payment') {
+                    // Para validación premium, mostrar TODA la información disponible
+                    console.log("Mostrando información premium completa para:", result);
+                    addCompletePremiumValidationInfo(result, statusDiv);
+                }
+            }
+            
+            // Mostrar información bancaria (tanto para éxito como para fallo)
+            if (result.card_details && result.card_details.bin_info) {
+                addBankInfoSection(resultContainer, result);
+            }
+            
+            // Agregar sección de detalles de error COMPLETOS si hay falla
+            if (!isSuccess && result.error_details) {
+                const errorSection = document.createElement('div');
+                errorSection.className = 'result-section error';
+                const errorTitle = document.createElement('h3');
+                errorTitle.innerHTML = '🔍 Análisis Completo del Error';
+                errorSection.appendChild(errorTitle);
+                
+                const errorGrid = document.createElement('div');
+                errorGrid.className = 'info-grid';
+                const errorDetails = result.error_details;
+                
+                errorGrid.innerHTML = `
+                    <span class="label">🔴 Tipo de Error:</span>
+                    <span><strong>${errorDetails.type || 'No disponible'}</strong></span>
+                    
+                    <span class="label">📋 Código de Error:</span>
+                    <span><strong>${errorDetails.code || 'No disponible'}</strong></span>
+                    
+                    <span class="label">❌ Código de Declinación:</span>
+                    <span><strong>${errorDetails.decline_code || 'No disponible'}</strong></span>
+                    
+                    <span class="label">💬 Mensaje Original:</span>
+                    <span>${errorDetails.message || 'No disponible'}</span>
+                    
+                    <span class="label">📊 Parámetro Afectado:</span>
+                    <span>${errorDetails.param || 'No disponible'}</span>
+                `;
+                
+                // Agregar códigos de red si están disponibles
+                if (errorDetails.network_decline_code || errorDetails.network_advice_code) {
+                    errorGrid.innerHTML += `
+                        <span class="label">🌐 Código de Red:</span>
+                        <span>${errorDetails.network_decline_code || 'No disponible'}</span>
+                        
+                        <span class="label">💡 Consejo de Red:</span>
+                        <span>${errorDetails.network_advice_code || 'No disponible'}</span>
+                    `;
+                }
+                
+                errorSection.appendChild(errorGrid);
+                resultContainer.appendChild(errorSection);
+            }
+        }
+        
+        // Función para mostrar información básica COMPLETA 
+        function addCompleteBasicValidationInfo(result, statusDiv) {
+            console.log("addCompleteBasicValidationInfo llamada con resultado:", result);
+            
+            let resultContainer = statusDiv.querySelector('.result-container');
+            if (!resultContainer) {
+                resultContainer = document.createElement('div');
+                resultContainer.className = 'result-container';
+                statusDiv.appendChild(resultContainer);
+            }
+            
+            // 1. INFORMACIÓN COMPLETA DEL SETUP INTENT
+            if (result.setup_details) {
+                const setupSection = document.createElement('div');
+                setupSection.className = 'result-section';
+                const setupTitle = document.createElement('h3');
+                setupTitle.innerHTML = '🔧 Detalles Completos del SetupIntent';
+                setupSection.appendChild(setupTitle);
+                
+                const setupGrid = document.createElement('div');
+                setupGrid.className = 'info-grid';
+                const setup = result.setup_details;
+                
+                setupGrid.innerHTML = `
+                    <span class="label">🆔 Setup Intent ID:</span>
+                    <span>${setup.id || 'No disponible'}</span>
+                    
+                    <span class="label">📊 Estado:</span>
+                    <span><strong>${setup.status || 'No disponible'}</strong></span>
+                    
+                    <span class="label">🎯 Uso:</span>
+                    <span>${setup.usage || 'No disponible'}</span>
+                    
+                    <span class="label">📅 Fecha de Creación:</span>
+                    <span>${setup.created ? new Date(setup.created * 1000).toLocaleString('es-ES') : 'No disponible'}</span>
+                    
+                    <span class="label">🔑 Cliente:</span>
+                    <span>${setup.customer || 'No disponible'}</span>
+                    
+                    <span class="label">📝 Descripción:</span>
+                    <span>${setup.description || 'No disponible'}</span>
+                    
+                    <span class="label">🔄 Modo Live:</span>
+                    <span>${setup.livemode ? '✅ Producción' : '⚠️ Test'}</span>
+                    
+                    <span class="label">📋 Tipos de Método de Pago:</span>
+                    <span>${setup.payment_method_types ? setup.payment_method_types.join(', ') : 'No disponible'}</span>
+                `;
+                
+                if (setup.last_setup_error) {
+                    setupGrid.innerHTML += `
+                        <span class="label">❌ Último Error:</span>
+                        <span style="color: red;">${setup.last_setup_error.message || 'Error sin mensaje'}</span>
+                    `;
+                }
+                
+                setupSection.appendChild(setupGrid);
+                resultContainer.appendChild(setupSection);
+            }
+            
+            // 2. INFORMACIÓN COMPLETA DEL PAYMENT METHOD
+            if (result.payment_method_details) {
+                const pmSection = document.createElement('div');
+                pmSection.className = 'result-section';
+                const pmTitle = document.createElement('h3');
+                pmTitle.innerHTML = '💳 Detalles Completos del Payment Method';
+                pmSection.appendChild(pmTitle);
+                
+                const pmGrid = document.createElement('div');
+                pmGrid.className = 'info-grid';
+                const pm = result.payment_method_details;
+                
+                pmGrid.innerHTML = `
+                    <span class="label">🆔 Payment Method ID:</span>
+                    <span>${pm.id || 'No disponible'}</span>
+                    
+                    <span class="label">🏷️ Tipo:</span>
+                    <span><strong>${pm.type || 'No disponible'}</strong></span>
+                    
+                    <span class="label">📅 Creado:</span>
+                    <span>${pm.created ? new Date(pm.created * 1000).toLocaleString('es-ES') : 'No disponible'}</span>
+                    
+                    <span class="label">🔄 Modo Live:</span>
+                    <span>${pm.livemode ? '✅ Producción' : '⚠️ Test'}</span>
+                `;
+                
+                if (pm.card) {
+                    pmGrid.innerHTML += `
+                        <span class="label">🏷️ Marca de Tarjeta:</span>
+                        <span><strong>${pm.card.brand ? pm.card.brand.toUpperCase() : 'No disponible'}</strong></span>
+                        
+                        <span class="label">🔢 Últimos 4 Dígitos:</span>
+                        <span><strong>****${pm.card.last4 || 'N/A'}</strong></span>
+                        
+                        <span class="label">📅 Expiración:</span>
+                        <span><strong>${pm.card.exp_month || 'N/A'}/${pm.card.exp_year || 'N/A'}</strong></span>
+                        
+                        <span class="label">🌍 País:</span>
+                        <span><strong>${pm.card.country || 'No disponible'}</strong></span>
+                        
+                        <span class="label">💰 Tipo de Financiamiento:</span>
+                        <span><strong>${pm.card.funding || 'No disponible'}</strong></span>
+                        
+                        <span class="label">🔍 Fingerprint:</span>
+                        <span>${pm.card.fingerprint || 'No disponible'}</span>
+                        
+                        <span class="label">🆔 IIN/BIN:</span>
+                        <span><strong>${pm.card.iin || 'No disponible'}</strong></span>
+                    `;
+                    
+                    if (pm.card.checks) {
+                        pmGrid.innerHTML += `
+                            <span class="label">🔒 CVC Check:</span>
+                            <span><strong>${pm.card.checks.cvc_check || 'No disponible'}</strong></span>
+                            
+                            <span class="label">🏠 Address Line1 Check:</span>
+                            <span>${pm.card.checks.address_line1_check || 'No disponible'}</span>
+                            
+                            <span class="label">📮 Postal Code Check:</span>
+                            <span>${pm.card.checks.address_postal_code_check || 'No disponible'}</span>
+                        `;
+                    }
+                    
+                    if (pm.card.three_d_secure_usage) {
+                        pmGrid.innerHTML += `
+                            <span class="label">🛡️ 3D Secure Soportado:</span>
+                            <span>${pm.card.three_d_secure_usage.supported ? '✅ Sí' : '❌ No'}</span>
+                        `;
+                    }
+                    
+                    if (pm.card.networks) {
+                        pmGrid.innerHTML += `
+                            <span class="label">🌐 Redes Disponibles:</span>
+                            <span>${pm.card.networks.available ? pm.card.networks.available.join(', ') : 'No disponible'}</span>
+                            
+                            <span class="label">🌐 Red Preferida:</span>
+                            <span>${pm.card.networks.preferred || 'No disponible'}</span>
+                        `;
+                    }
+                }
+                
+                pmSection.appendChild(pmGrid);
+                resultContainer.appendChild(pmSection);
+            }
+            
+            // 3. MOSTRAR INFORMACIÓN BANCARIA
+            if (result.card_details && result.card_details.bin_info) {
+                addBankInfoSection(resultContainer, result);
+            }
+            
+            // 4. DIAGNÓSTICO COMPLETO
+            addCompleteDiagnosticSection(result, resultContainer);
+        }
+        
+        // Función para mostrar información premium COMPLETA
+        function addCompletePremiumValidationInfo(result, statusDiv) {
+            console.log("addPremiumFeatures llamada con resultado:", result);
+            
+            let resultContainer = statusDiv.querySelector('.result-container');
+            if (!resultContainer) {
+                resultContainer = document.createElement('div');
+                resultContainer.className = 'result-container';
+                statusDiv.appendChild(resultContainer);
+            }
+            
+            // 1. INFORMACIÓN COMPLETA DE LA TRANSACCIÓN
+            if (result.payment_details) {
+                console.log("Mostrando payment_details:", result.payment_details);
+                const transactionSection = document.createElement('div');
+                transactionSection.className = 'result-section';
+                const transactionTitle = document.createElement('h3');
+                transactionTitle.innerHTML = '💳 Detalles de la Transacción';
+                transactionSection.appendChild(transactionTitle);
+                
+                const transactionGrid = document.createElement('div');
+                transactionGrid.className = 'info-grid';
+                const payment = result.payment_details;
+                
+                transactionGrid.innerHTML = `
+                    <span class="label">🆔 Payment Intent ID:</span>
+                    <span>${payment.id || 'No disponible'}</span>
+                    
+                    <span class="label">📊 Estado:</span>
+                    <span><strong>${payment.status || 'No disponible'}</strong></span>
+                    
+                    <span class="label">💰 Monto:</span>
+                    <span>$${(payment.amount / 100).toFixed(2)} ${(payment.currency || 'USD').toUpperCase()}</span>
+                    
+                    <span class="label">⚡ Método de Captura:</span>
+                    <span>${payment.capture_method === 'manual' ? 'Manual' : payment.capture_method || 'No disponible'}</span>
+                    
+                    <span class="label">📄 Descriptor:</span>
+                    <span>${payment.statement_descriptor || 'No disponible'}</span>
+                    
+                    <span class="label">📅 Fecha de Creación:</span>
+                    <span>${payment.created ? new Date(payment.created * 1000).toLocaleString('es-ES') : 'No disponible'}</span>
+                    
+                    <span class="label">🔗 Cargo Asociado:</span>
+                    <span>${payment.latest_charge || 'No disponible'}</span>
+                `;
+                
+                transactionSection.appendChild(transactionGrid);
+                resultContainer.appendChild(transactionSection);
+            }
+            
+            // 1. INFORMACIÓN BÁSICA DE LA TARJETA (usar función reutilizable)
+            if (result && result.card_details) {
+                addBankInfoSection(resultContainer, result);
+            }
+            
+            // 2. INFORMACIÓN COMPLETA DEL CARGO
+            if (result.charge_info) {
+                const chargeSection = document.createElement('div');
+                chargeSection.className = 'result-section';
+                const chargeTitle = document.createElement('h3');
+                chargeTitle.innerHTML = '💰 Detalles Completos del Cargo';
+                chargeSection.appendChild(chargeTitle);
+                
+                const chargeGrid = document.createElement('div');
+                chargeGrid.className = 'info-grid';
+                const charge = result.charge_info;
+                
+                chargeGrid.innerHTML = `
+                    <span class="label">🆔 Charge ID:</span>
+                    <span>${charge.id || 'No disponible'}</span>
+                    
+                    <span class="label">📊 Estado del Cargo:</span>
+                    <span><strong>${charge.status || 'No disponible'}</strong></span>
+                    
+                    <span class="label">💵 Monto:</span>
+                    <span>$${(charge.amount / 100).toFixed(2)} ${(charge.currency || 'USD').toUpperCase()}</span>
+                    
+                    <span class="label">✅ Pagado:</span>
+                    <span>${charge.paid ? '✅ Sí' : '❌ No'}</span>
+                    
+                    <span class="label">📦 Capturado:</span>
+                    <span>${charge.captured ? '✅ Sí' : '❌ No'}</span>
+                    
+                    <span class="label">🔄 Reembolsado:</span>
+                    <span>${charge.refunded ? '✅ Sí' : '❌ No'}</span>
+                    
+                    <span class="label">⚖️ Disputado:</span>
+                    <span>${charge.disputed ? '⚠️ Sí' : '✅ No'}</span>
+                    
+                    <span class="label">📄 Descriptor Calculado:</span>
+                    <span>${charge.calculated_statement_descriptor || 'No disponible'}</span>
+                    
+                    <span class="label">📅 Fecha de Creación:</span>
+                    <span>${charge.created ? new Date(charge.created * 1000).toLocaleString('es-ES') : 'No disponible'}</span>
+                `;
+                
+                chargeSection.appendChild(chargeGrid);
+                resultContainer.appendChild(chargeSection);
+            }
+            
+            // 3. ANÁLISIS DE RIESGO Y OUTCOME COMPLETO
+            if (result.charge_info && result.charge_info.outcome) {
+                const riskSection = document.createElement('div');
+                riskSection.className = 'result-section';
+                const riskTitle = document.createElement('h3');
+                riskTitle.innerHTML = '🛡️ Análisis de Riesgo y Outcome';
+                riskSection.appendChild(riskTitle);
+                
+                const riskGrid = document.createElement('div');
+                riskGrid.className = 'info-grid';
+                const outcome = result.charge_info.outcome;
+                
+                let riskLevelText = 'No disponible';
+                let riskColor = '';
+                let typeText = 'No disponible';
+                let networkStatusText = 'No disponible';
+                
+                if (outcome.risk_level) {
+                    switch(outcome.risk_level.toLowerCase()) {
+                        case 'low':
+                        case 'normal':
+                            riskColor = 'risk-low';
+                            riskLevelText = 'Bajo ✅';
+                            break;
+                        case 'elevated':
+                        case 'medium':
+                            riskColor = 'risk-medium';
+                            riskLevelText = 'Medio ⚠️';
+                            break;
+                        case 'high':
+                        case 'highest':
+                            riskColor = 'risk-high';
+                            riskLevelText = 'Alto ❌';
+                            break;
+                        default:
+                            riskLevelText = outcome.risk_level;
+                    }
+                }
+                
+                if (outcome.type) {
+                    switch(outcome.type) {
+                        case 'authorized':
+                            typeText = 'Autorizada ✅';
+                            break;
+                        case 'manual_review':
+                            typeText = 'Revisión Manual ⚠️';
+                            break;
+                        case 'issuer_declined':
+                            typeText = 'Rechazada por Emisor ❌';
+                            break;
+                        case 'blocked':
+                            typeText = 'Bloqueada ❌';
+                            break;
+                        default:
+                            typeText = outcome.type;
+                    }
+                }
+                
+                if (outcome.network_status) {
+                    switch(outcome.network_status) {
+                        case 'approved_by_network':
+                            networkStatusText = 'Aprobada por Red ✅';
+                            break;
+                        case 'declined_by_network':
+                            networkStatusText = 'Rechazada por Red ❌';
+                            break;
+                        default:
+                            networkStatusText = outcome.network_status;
+                    }
+                }
+                
+                riskGrid.innerHTML = `
+                    <span class="label">⚠️ Nivel de Riesgo:</span>
+                    <span class="${riskColor}"><strong>${riskLevelText}</strong></span>
+                    
+                    <span class="label">📊 Tipo de Outcome:</span>
+                    <span><strong>${typeText}</strong></span>
+                    
+                    <span class="label">🌐 Estado de Red:</span>
+                    <span><strong>${networkStatusText}</strong></span>
+                    
+                    <span class="label">💬 Mensaje del Vendedor:</span>
+                    <span>${outcome.seller_message || 'No disponible'}</span>
+                `;
+                
+                riskSection.appendChild(riskGrid);
+                resultContainer.appendChild(riskSection);
+            }
+            
+            // 4. INFORMACIÓN DETALLADA DE LA TARJETA
+            if (result.card_details) {
+                const cardSection = document.createElement('div');
+                cardSection.className = 'result-section';
+                const cardTitle = document.createElement('h3');
+                cardTitle.innerHTML = '💳 Información Completa de la Tarjeta';
+                cardSection.appendChild(cardTitle);
+                
+                const cardGrid = document.createElement('div');
+                cardGrid.className = 'info-grid';
+                const card = result.card_details;
+                
+                let fundingType = 'No disponible';
+                if (card.funding) {
+                    switch(card.funding) {
+                        case 'credit': fundingType = 'Crédito 💳'; break;
+                        case 'debit': fundingType = 'Débito 💳'; break;
+                        case 'prepaid': fundingType = 'Prepago 💳'; break;
+                        default: fundingType = card.funding;
+                    }
+                }
+                
+                let cvcStatus = 'No verificado';
+                if (card.checks && card.checks.cvc_check) {
+                    switch(card.checks.cvc_check) {
+                        case 'pass': cvcStatus = 'Aprobado ✅'; break;
+                        case 'fail': cvcStatus = 'Fallido ❌'; break;
+                        case 'unavailable': cvcStatus = 'No disponible ⚠️'; break;
+                        case 'unchecked': cvcStatus = 'No verificado ⚠️'; break;
+                        default: cvcStatus = card.checks.cvc_check;
+                    }
+                }
+                
+                cardGrid.innerHTML = `
+                    <span class="label">🏷️ Marca:</span>
+                    <span><strong>${card.brand ? card.brand.toUpperCase() : 'No disponible'}</strong></span>
+                    
+                    <span class="label">🔢 Últimos 4 Dígitos:</span>
+                    <span><strong>****${card.last4 || 'N/A'}</strong></span>
+                    
+                    <span class="label">📅 Expiración:</span>
+                    <span><strong>${card.exp_month || 'N/A'}/${card.exp_year || 'N/A'}</strong></span>
+                    
+                    <span class="label">🌍 País de Emisión:</span>
+                    <span><strong>${card.country || 'No disponible'}</strong></span>
+                    
+                    <span class="label">💰 Tipo de Financiamiento:</span>
+                    <span><strong>${fundingType}</strong></span>
+                    
+                    <span class="label">🔒 Verificación CVC:</span>
+                    <span><strong>${cvcStatus}</strong></span>
+                    
+                    <span class="label">🆔 IIN/BIN:</span>
+                    <span><strong>${card.iin || 'No disponible'}</strong></span>
+                `;
+                
+                // Agregar información de redes si está disponible
+                if (card.networks && card.networks.available) {
+                    cardGrid.innerHTML += `
+                        <span class="label">🌐 Redes Disponibles:</span>
+                        <span><strong>${card.networks.available.join(', ')}</strong></span>
+                    `;
+                }
+                
+                // Agregar soporte 3D Secure si está disponible
+                if (card.three_d_secure_usage) {
+                    cardGrid.innerHTML += `
+                        <span class="label">🛡️ 3D Secure:</span>
+                        <span><strong>${card.three_d_secure_usage.supported ? 'Soportado ✅' : 'No Soportado ❌'}</strong></span>
+                    `;
+                }
+                
+                cardSection.appendChild(cardGrid);
+                resultContainer.appendChild(cardSection);
+            }
+            
+            // 5. MOSTRAR INFORMACIÓN BANCARIA
+            if (result.card_details && result.card_details.bin_info) {
+                addBankInfoSection(resultContainer, result);
+            }
+            
+            // 6. METADATA Y DETALLES TÉCNICOS
+            if (result.payment_details && result.payment_details.metadata) {
+                const metadataSection = document.createElement('div');
+                metadataSection.className = 'result-section';
+                const metadataTitle = document.createElement('h3');
+                metadataTitle.innerHTML = '🔧 Metadata y Detalles Técnicos';
+                metadataSection.appendChild(metadataTitle);
+                
+                const metadataGrid = document.createElement('div');
+                metadataGrid.className = 'info-grid';
+                const metadata = result.payment_details.metadata;
+                
+                let metadataHTML = '';
+                Object.keys(metadata).forEach(key => {
+                    metadataHTML += `
+                        <span class="label">${key}:</span>
+                        <span>${metadata[key] || 'No disponible'}</span>
+                    `;
+                });
+                
+                metadataGrid.innerHTML = metadataHTML;
+                metadataSection.appendChild(metadataGrid);
+                resultContainer.appendChild(metadataSection);
+            }
+            
+            // 7. DIAGNÓSTICO COMPLETO
+            addCompleteDiagnosticSection(result, resultContainer);
+            
+        }
+        
+        // Función para mostrar diagnóstico completo común ORGANIZADO
+        function addCompleteDiagnosticSection(result, resultContainer) {
+            // Crear múltiples secciones organizadas por tipo de datos
+            
+            // 1. SECCIÓN DE DATOS PRINCIPALES
+            if (result.payment_details || result.setup_details) {
+                const mainSection = document.createElement('div');
+                mainSection.className = 'result-section';
+                const mainTitle = document.createElement('h3');
+                mainTitle.innerHTML = '📋 Resumen de Datos Principales';
+                mainSection.appendChild(mainTitle);
+                
+                const mainGrid = document.createElement('div');
+                mainGrid.className = 'info-grid';
+                
+                let mainHTML = `
+                    <span class="label">✅ Validación Exitosa:</span>
+                    <span><strong>${result.success ? 'Sí' : 'No'}</strong></span>
+                    
+                    <span class="label">📊 Estado:</span>
+                    <span><strong>${result.status || 'No disponible'}</strong></span>
+                    
+                    <span class="label">🔄 Modo:</span>
+                    <span><strong>${result.isSetupIntent ? 'SetupIntent (Básico)' : result.isPaymentIntent ? 'PaymentIntent (Premium)' : 'Tipo Desconocido'}</strong></span>
+                    
+                    <span class="label">⏰ Timestamp del Servidor:</span>
+                    <span>${result.server_timestamp ? new Date(result.server_timestamp).toLocaleString('es-ES') : 'No disponible'}</span>
+                    
+                    <span class="label">🔍 Debugging - isSetupIntent:</span>
+                    <span><strong>${result.isSetupIntent ? 'true' : 'false'}</strong></span>
+                    
+                    <span class="label">🔍 Debugging - isPaymentIntent:</span>
+                    <span><strong>${result.isPaymentIntent ? 'true' : 'false'}</strong></span>
+                `;
+                
+                if (result.payment_intent) {
+                    mainHTML += `
+                        <span class="label">🆔 Payment Intent ID:</span>
+                        <span><strong>${result.payment_intent}</strong></span>
+                    `;
+                }
+                
+                if (result.setup_intent) {
+                    mainHTML += `
+                        <span class="label">🆔 Setup Intent ID:</span>
+                        <span><strong>${result.setup_intent}</strong></span>
+                    `;
+                }
+                
+                mainGrid.innerHTML = mainHTML;
+                mainSection.appendChild(mainGrid);
+                resultContainer.appendChild(mainSection);
+            }
+            
+            // 2. SECCIÓN DE DETALLES DE VALIDACIÓN
+            if (result.validation_details) {
+                const validationSection = document.createElement('div');
+                validationSection.className = 'result-section';
+                const validationTitle = document.createElement('h3');
+                validationTitle.innerHTML = '🔍 Detalles de Validación Internos';
+                validationSection.appendChild(validationTitle);
+                
+                const validationGrid = document.createElement('div');
+                validationGrid.className = 'info-grid';
+                const validation = result.validation_details;
+                
+                validationGrid.innerHTML = `
+                    <span class="label">✅ Es Válida:</span>
+                    <span><strong>${validation.isValid ? 'Sí' : 'No'}</strong></span>
+                    
+                    <span class="label">📝 Razón:</span>
+                    <span>${validation.reason || 'No disponible'}</span>
+                    
+                    <span class="label">🔧 Método de Validación:</span>
+                    <span>${validation.validationMethod || 'No disponible'}</span>
+                `;
+                
+                validationSection.appendChild(validationGrid);
+                resultContainer.appendChild(validationSection);
+            }
+            
+            // 3. SECCIÓN DE OBJETOS RAW (SOLO SI EXISTEN)
+            const rawObjects = [];
+            if (result.raw_payment_intent) rawObjects.push(['PaymentIntent Raw', result.raw_payment_intent]);
+            if (result.raw_setup_intent) rawObjects.push(['SetupIntent Raw', result.raw_setup_intent]);
+            
+            if (rawObjects.length > 0) {
+                const rawSection = document.createElement('div');
+                rawSection.className = 'result-section';
+                const rawTitle = document.createElement('h3');
+                rawTitle.innerHTML = '🔧 Objetos Raw de Stripe (Desarrolladores)';
+                rawSection.appendChild(rawTitle);
+                
+                rawObjects.forEach(([title, obj]) => {
+                    const objDiv = document.createElement('div');
+                    objDiv.style.marginBottom = '15px';
+                    
+                    const objTitle = document.createElement('h4');
+                    objTitle.innerHTML = title;
+                    objTitle.style.margin = '10px 0 5px 0';
+                    objTitle.style.fontSize = '14px';
+                    objTitle.style.color = '#666';
+                    objDiv.appendChild(objTitle);
+                    
+                    const objContent = document.createElement('pre');
+                    objContent.style.background = '#f5f5f5';
+                    objContent.style.padding = '10px';
+                    objContent.style.borderRadius = '4px';
+                    objContent.style.fontSize = '11px';
+                    objContent.style.maxHeight = '200px';
+                    objContent.style.overflow = 'auto';
+                    objContent.style.whiteSpace = 'pre-wrap';
+                    objContent.style.wordBreak = 'break-all';
+                    
+                    const jsonString = JSON.stringify(obj, null, 2);
+                    objContent.textContent = jsonString.length > 2000 ? 
+                        jsonString.substring(0, 2000) + '\n\n... (truncado por longitud)' : 
+                        jsonString;
+                    
+                    objDiv.appendChild(objContent);
+                    rawSection.appendChild(objDiv);
+                });
+                
+                resultContainer.appendChild(rawSection);
+            }
+            
+            // 4. SECCIÓN DE TODOS LOS OTROS CAMPOS
+            const otherFields = {};
+            Object.keys(result).forEach(key => {
+                // Excluir campos que ya se mostraron en otras secciones
+                if (!['success', 'status', 'server_timestamp', 'payment_intent', 'setup_intent', 
+                      'isSetupIntent', 'isPaymentIntent', 'validation_details', 'payment_details', 
+                      'setup_details', 'card_details', 'charge_info', 'payment_method_details',
+                      'raw_payment_intent', 'raw_setup_intent'].includes(key)) {
+                    otherFields[key] = result[key];
+                }
+            });
+            
+            if (Object.keys(otherFields).length > 0) {
+                const otherSection = document.createElement('div');
+                otherSection.className = 'result-section';
+                const otherTitle = document.createElement('h3');
+                otherTitle.innerHTML = '📊 Campos Adicionales de la Respuesta';
+                otherSection.appendChild(otherTitle);
+                
+                const otherGrid = document.createElement('div');
+                otherGrid.className = 'info-grid';
+                
+                let otherHTML = '';
+                Object.keys(otherFields).forEach(key => {
+                    const value = otherFields[key];
+                    if (value !== null && value !== undefined) {
+                        if (typeof value === 'object') {
+                            otherHTML += `
+                                <span class="label">${key}:</span>
+                                <span style="font-family: monospace; font-size: 11px;">${JSON.stringify(value).substring(0, 100)}${JSON.stringify(value).length > 100 ? '...' : ''}</span>
+                            `;
+                        } else {
+                            otherHTML += `
+                                <span class="label">${key}:</span>
+                                <span><strong>${value}</strong></span>
+                            `;
+                        }
+                    }
+                });
+                
+                otherGrid.innerHTML = otherHTML;
+                otherSection.appendChild(otherGrid);
+                resultContainer.appendChild(otherSection);
+            }
+        }
+        
+        // Función para mostrar errores
+        function displayValidationError(error, statusDiv, formType) {
+            statusDiv.innerHTML = '';
+            statusDiv.className = 'status';
+            
+            const resultContainer = document.createElement('div');
+            resultContainer.className = 'result-container';
+            
+            const errorSection = document.createElement('div');
+            errorSection.className = 'result-section error';
+            
+            const errorTitle = document.createElement('h3');
+            const costText = formType === 'setup' ? 'GRATIS' : 'PREMIUM';
+            errorTitle.innerHTML = `❌ TARJETA INVÁLIDA (${costText})`;
+            errorSection.appendChild(errorTitle);
+            
+            // Mensajes de error mejorados en español
+            const errorMessages = {
+                'insufficient_funds': '💳 Tu tarjeta no tiene fondos suficientes',
+                'expired_card': '📅 Esta tarjeta ha expirado. Verifica la fecha',
+                'incorrect_cvc': '🔒 El código de seguridad es incorrecto',
+                'rate_limit_exceeded': '⏳ Has hecho muchas consultas. Espera 15 minutos',
+                'generic_decline': '🚫 Tu banco rechazó la transacción',
+                'lost_card': '⛔ Esta tarjeta ha sido reportada como perdida',
+                'stolen_card': '⛔ Esta tarjeta ha sido reportada como robada',
+                'incorrect_number': '❌ El número de tarjeta es incorrecto',
+                'invalid_expiry_month': '📅 El mes de expiración no es válido',
+                'invalid_expiry_year': '📅 El año de expiración no es válido',
+                'invalid_cvc': '🔒 El código de seguridad no es válido',
+                'incorrect_zip': '📮 El código postal no coincide',
+                'card_velocity_exceeded': '⚡ Demasiadas transacciones en poco tiempo',
+                'withdrawal_count_limit_exceeded': '📊 Límite de retiros excedido',
+                'currency_not_supported': '💱 Esta tarjeta no acepta USD',
+                'restricted_card': '🔒 Tu tarjeta tiene restricciones de uso',
+                'security_violation': '🛡️ Problema de seguridad detectado',
+                'suspected_fraud': '🚨 Transacción marcada como sospechosa',
+                'card_not_supported': '❌ Esta tarjeta no es compatible',
+                'offline_pin_required': '📱 Se requiere PIN offline',
+                'approval_expired': '⏰ La aprobación ha expirado',
+                'authentication_required': '🔐 Se requiere autenticación adicional',
+                'call_issuer': '☎️ Contacta a tu banco emisor',
+                'pickup_card': '🏦 Tu banco solicita retener la tarjeta',
+                'test_mode_live_card': '🧪 Error de modo de prueba'
+            };
+            
+            let reasonMessage = error.message || 'Error al procesar la tarjeta';
+            if (error.decline_code) {
+                reasonMessage = errorMessages[error.decline_code] || error.message;
+            }
+            
+            const reasonElement = document.createElement('p');
+            reasonElement.style.fontSize = '15px';
+            reasonElement.style.fontWeight = 'bold';
+            reasonElement.style.color = '#d63031';
+            reasonElement.innerHTML = `❌ ${reasonMessage}`;
+            errorSection.appendChild(reasonElement);
+            
+            resultContainer.appendChild(errorSection);
+            statusDiv.appendChild(resultContainer);
+        }
+        
+        // Función antigua mantenida para compatibilidad (DEPRECATED)
+        document.getElementById('card-check-form-OLD') && document.getElementById('card-check-form-OLD').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const submitButton = document.getElementById('submit-button');
+            const statusDiv = document.getElementById('status');
+        
+            // Deshabilitar el botón y mostrar estado
+            submitButton.disabled = true;
+            submitButton.textContent = 'Procesando...';
+            statusDiv.style.display = 'block';
+            // Indicadores de progreso paso a paso
+            const progressSteps = [
+                '1/5 📝 Validando datos de tarjeta...',
+                '2/5 🔧 Creando método de pago...',
+                '3/5 💳 Procesando autorización...',
+                '4/5 🛡️ Verificando seguridad...',
+                '5/5 ✅ Completando validación...'
+            ];
+            
+            let currentStep = 0;
+            statusDiv.textContent = progressSteps[currentStep];
+            statusDiv.className = 'status';
+            
+            const progressInterval = setInterval(() => {
+                currentStep++;
+                if (currentStep < progressSteps.length) {
+                    statusDiv.textContent = progressSteps[currentStep];
+                } else {
+                    clearInterval(progressInterval);
+                }
+            }, 800);
+
+            try {
+                // Crear método de pago con Stripe
+                const { paymentMethod, error } = await stripe.createPaymentMethod({
+                    type: 'card',
+                    card: card,
+                    billing_details: {},
+                    metadata: {
+                        source: 'my-radar-card-validity',
+                        timestamp: new Date().toISOString()
+                    }
+                });
+
+                if (error) {
+                    console.error("Error creating payment method:", error);
+                    throw error;
+                }
+                
+                clearInterval(progressInterval);
+                statusDiv.textContent = '4/5 🛡️ Verificando 3D Secure...';
+
+                // Usar la función de Netlify para verificación
+                const functionUrl = '/.netlify/functions/verify-card';
+                console.log("Calling Netlify function:", functionUrl);
+                console.log("Payment method ID:", paymentMethod.id);
+                
+                const response = await fetch(functionUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        payment_method_id: paymentMethod.id
+                    }),
+                });
+                
+                console.log("Response status:", response.status);
+                
+                // Obtener la respuesta JSON incluso si hay un error HTTP
+                const responseText = await response.text();
+                console.log("Server response:", responseText);
+                
+                let result;
+                try {
+                    result = JSON.parse(responseText);
+                    console.log("Parsed response:", result);
+                } catch (e) {
+                    console.error("Error parsing JSON response:", e);
+                    throw new Error(`Server error: ${response.status} ${response.statusText}`);
+                }
+
+                if (result.error) {
+                    // Si hay un error, creamos un objeto de error más detallado
+                    const customError = new Error(result.error);
+                    // Copiamos todos los campos de la respuesta al objeto error
+                    Object.keys(result).forEach(key => {
+                        customError[key] = result[key];
+                    });
+                    
+                    console.log("Detailed error response:", result);
+                    throw customError;
+                }
+
+                // Handle 3D Secure authentication if required
+                if (result.requires_action) {
+                    console.log("3D Secure authentication required");
+                    statusDiv.textContent = '🔐 Completando autenticación 3D Secure...';
+                    
+                    try {
+                        console.log("Confirming setup intent with client secret");
+                        const { error: confirmError, setupIntent } = await stripe.confirmSetupIntent(
+                            result.client_secret
+                        );
+                        
+                        if (confirmError) {
+                            console.error("3D Secure confirmation error:", confirmError);
+                            throw confirmError;
+                        }
+                        
+                        console.log("3D Secure confirmed successfully:", setupIntent.status);
+                        
+                        // Llamar de nuevo a la función para verificar el resultado después de 3D Secure
+                        const secondResponse = await fetch(functionUrl, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                payment_method_id: paymentMethod.id,
+                                setup_intent_id: setupIntent.id
+                            }),
+                        });
+                        
+                        const secondResponseText = await secondResponse.text();
+                        const secondResult = JSON.parse(secondResponseText);
+                        
+                        if (secondResult.error) {
+                            throw new Error(secondResult.error);
+                        }
+                        
+                        // Verificar el resultado basándose en los detalles de validación
+                        let cardIsValid = false;
+                        let validationMessage = "";
+                        
+                        // Usar los detalles de validación para Setup Intent
+                        if (secondResult.validation_details) {
+                            cardIsValid = secondResult.validation_details.isValid === true;
+                            validationMessage = secondResult.validation_details.reason || "";
+                            console.log("3D Secure validation details:", secondResult.validation_details);
+                        }
+                        // Verificación basada en Setup Intent status
+                        else if (secondResult.setup_details && secondResult.setup_details.status) {
+                            cardIsValid = secondResult.setup_details.status === 'succeeded';
+                        }
+                        
+                        if (secondResult.success || cardIsValid) {
+                            // Limpiar el contenedor para agregar elementos en el orden correcto
+                            statusDiv.innerHTML = '';
+                            statusDiv.className = 'status';
+                            
+                            // Crear contenedor principal para los resultados
+                            const resultContainer = document.createElement('div');
+                            resultContainer.className = 'result-container';
+                            
+                            // Crear sección principal de éxito
+                            const successSection = document.createElement('div');
+                            successSection.className = 'result-section success';
+                            
+                            // Título principal de éxito
+                            const successTitle = document.createElement('h3');
+                            successTitle.innerHTML = '✅ TARJETA VÁLIDA (3D Secure)';
+                            successSection.appendChild(successTitle);
+                            
+                            // Mensaje de confirmación
+                            const confirmMessage = document.createElement('p');
+                            confirmMessage.style.fontSize = '15px';
+                            confirmMessage.style.fontWeight = 'bold';
+                            confirmMessage.style.color = '#009432';
+                            confirmMessage.innerHTML = '✅ La autenticación 3D Secure y autorización fueron exitosas';
+                            successSection.appendChild(confirmMessage);
+                            
+                            // Si hay detalles de la tarjeta, mostrarlos
+                            if (secondResult.card_details) {
+                                const card = secondResult.card_details;
+                                
+                                let fundingType = '';
+                                if (card.funding) {
+                                    if (card.funding === 'credit') fundingType = 'Crédito';
+                                    else if (card.funding === 'debit') fundingType = 'Débito';
+                                    else if (card.funding === 'prepaid') fundingType = 'Prepago';
+                                    else fundingType = card.funding;
+                                }
+                                
+                                const cardDetails = document.createElement('div');
+                                cardDetails.className = 'card-display';
+                                
+                                cardDetails.innerHTML = `
+                                    <p><strong>💳 Tarjeta:</strong> ${card.brand.toUpperCase()} **** **** **** ${card.last4}</p>
+                                    <p><strong>⏱️ Expiración:</strong> ${card.exp_month}/${card.exp_year}</p>
+                                    <p><strong>🌎 País:</strong> ${card.country || 'No disponible'} | <strong>Tipo:</strong> ${fundingType || 'No disponible'}</p>
+                                `;
+                                
+                                successSection.appendChild(cardDetails);
+                            }
+                            
+                            // Añadir nota sobre validación sin cargo
+                            const validationNote = document.createElement('p');
+                            validationNote.className = 'refund-note';
+                            validationNote.innerHTML = '* Validación realizada sin ningún cargo a tu tarjeta';
+                            successSection.appendChild(validationNote);
+                            
+                            // Añadir la sección de éxito al contenedor principal
+                            resultContainer.appendChild(successSection);
+                            statusDiv.appendChild(resultContainer);
+                            
+                            // Mostrar información detallada (sin cargo info para Setup Intent)
+                            if (secondResult.setup_details) {
+                                addSetupDetails(secondResult.setup_details, statusDiv, secondResult);
+                            }
+                        } else {
+                            // Limpiar el contenedor para agregar elementos en el orden correcto
+                            statusDiv.innerHTML = '';
+                            statusDiv.className = 'status';
+                            
+                            // Crear contenedor principal para los resultados
+                            const resultContainer = document.createElement('div');
+                            resultContainer.className = 'result-container';
+                            
+                            // Crear sección principal de error
+                            const errorSection = document.createElement('div');
+                            errorSection.className = 'result-section error';
+                            
+                            // Título principal de error
+                            const errorTitle = document.createElement('h3');
+                            errorTitle.innerHTML = '❌ TARJETA INVÁLIDA (3D Secure)';
+                            errorSection.appendChild(errorTitle);
+                            
+                            // Mensaje de razón principal
+                            let reasonMessage = secondResult.validation_details ? 
+                                secondResult.validation_details.reason : 
+                                'No se pudo validar correctamente después de 3D Secure';
+                            
+                            const reasonElement = document.createElement('p');
+                            reasonElement.style.fontSize = '15px';
+                            reasonElement.style.fontWeight = 'bold';
+                            reasonElement.style.color = '#d63031';
+                            reasonElement.innerHTML = `❌ ${reasonMessage}`;
+                            errorSection.appendChild(reasonElement);
+                            
+                            // Detalles de la tarjeta
+                            if (secondResult.card_details) {
+                                const card = secondResult.card_details;
+                                
+                                let fundingType = '';
+                                if (card.funding) {
+                                    if (card.funding === 'credit') fundingType = 'Crédito';
+                                    else if (card.funding === 'debit') fundingType = 'Débito';
+                                    else if (card.funding === 'prepaid') fundingType = 'Prepago';
+                                    else fundingType = card.funding;
+                                }
+                                
+                                const cardDetails = document.createElement('div');
+                                cardDetails.className = 'card-display';
+                                
+                                cardDetails.innerHTML = `
+                                    <p><strong>💳 Tarjeta:</strong> ${card.brand.toUpperCase()} **** **** **** ${card.last4}</p>
+                                    <p><strong>⏱️ Expiración:</strong> ${card.exp_month}/${card.exp_year}</p>
+                                    <p><strong>🌎 País:</strong> ${card.country || 'No disponible'} | <strong>Tipo:</strong> ${fundingType || 'No disponible'}</p>
+                                `;
+                                errorSection.appendChild(cardDetails);
+                            }
+                            
+                            // Añadir la sección de error al contenedor principal
+                            resultContainer.appendChild(errorSection);
+                            statusDiv.appendChild(resultContainer);
+                            
+                            // Añadir más información si está disponible (Setup Intent)
+                            if (secondResult.setup_details) {
+                                addSetupDetails(secondResult.setup_details, statusDiv, secondResult);
+                            }
+                        }
+                        
+                        return;
+                    } catch (auth3dError) {
+                        console.error("3D Secure auth error:", auth3dError);
+                        throw auth3dError;
+                    }
+                }
+
+                // Procesar resultado
+                // Verificar el resultado basándose en los detalles de validación
+                let cardIsValid = false;
+                let validationMessage = "";
+                
+                // Usar los detalles de validación para Setup Intent
+                if (result.validation_details) {
+                    cardIsValid = result.validation_details.isValid === true;
+                    validationMessage = result.validation_details.reason || "";
+                    console.log("Validation details:", result.validation_details);
+                }
+                // Verificación basada en Setup Intent status
+                else if (result.setup_details && result.setup_details.status) {
+                    cardIsValid = result.setup_details.status === 'succeeded';
+                }
+                
+                if (result.success || cardIsValid) {
+                    // Limpiar el contenedor para agregar elementos en el orden correcto
+                    statusDiv.innerHTML = '';
+                    statusDiv.className = 'status';
+                    
+                    // Crear contenedor principal para los resultados
+                    const resultContainer = document.createElement('div');
+                    resultContainer.className = 'result-container';
+                    
+                    // Crear sección principal de éxito
+                    const successSection = document.createElement('div');
+                    successSection.className = 'result-section success';
+                    
+                    // Título principal de éxito
+                    const successTitle = document.createElement('h3');
+                    successTitle.innerHTML = '✅ TARJETA VÁLIDA';
+                    successSection.appendChild(successTitle);
+                    
+                    // Mensaje de confirmación
+                    const confirmMessage = document.createElement('p');
+                    confirmMessage.style.fontSize = '15px';
+                    confirmMessage.style.fontWeight = 'bold';
+                    confirmMessage.style.color = '#009432';
+                    confirmMessage.innerHTML = '✅ La autorización fue exitosa';
+                    successSection.appendChild(confirmMessage);
+                    
+                    // Si hay detalles de la tarjeta, mostrarlos
+                    if (result.card_details) {
+                        const card = result.card_details;
+                        
+                        let fundingType = '';
+                        if (card.funding) {
+                            if (card.funding === 'credit') fundingType = 'Crédito';
+                            else if (card.funding === 'debit') fundingType = 'Débito';
+                            else if (card.funding === 'prepaid') fundingType = 'Prepago';
+                            else fundingType = card.funding;
+                        }
+                        
+                        const cardDetails = document.createElement('div');
+                        cardDetails.className = 'card-display';
+                        
+                        cardDetails.innerHTML = `
+                            <p><strong>💳 Tarjeta:</strong> ${card.brand.toUpperCase()} **** **** **** ${card.last4}</p>
+                            <p><strong>⏱️ Expiración:</strong> ${card.exp_month}/${card.exp_year}</p>
+                            <p><strong>🌎 País:</strong> ${card.country || 'No disponible'} | <strong>Tipo:</strong> ${fundingType || 'No disponible'}</p>
+                        `;
+                        
+                        successSection.appendChild(cardDetails);
+                    }
+                    
+                    // Añadir nota sobre validación sin cargo
+                    const validationNote = document.createElement('p');
+                    validationNote.className = 'refund-note';
+                    validationNote.innerHTML = '* Validación realizada sin ningún cargo a tu tarjeta';
+                    successSection.appendChild(validationNote);
+                    
+                    // Añadir la sección de éxito al contenedor principal
+                    resultContainer.appendChild(successSection);
+                    statusDiv.appendChild(resultContainer);
+                    
+                    // Mostrar información detallada (sin cargo info para Setup Intent)
+                    if (result.setup_details) {
+                        addSetupDetails(result.setup_details, statusDiv, result);
+                    }
+                } else {
+                    // Limpiar el contenedor para agregar elementos en el orden correcto
+                    statusDiv.innerHTML = '';
+                    statusDiv.className = 'status';
+                    
+                    // Crear contenedor principal para los resultados
+                    const resultContainer = document.createElement('div');
+                    resultContainer.className = 'result-container';
+                    
+                    // Crear sección principal de error
+                    const errorSection = document.createElement('div');
+                    errorSection.className = 'result-section error';
+                    
+                    // Título principal de error
+                    const errorTitle = document.createElement('h3');
+                    errorTitle.innerHTML = '❌ TARJETA INVÁLIDA';
+                    errorSection.appendChild(errorTitle);
+                    
+                    // Mensaje de razón principal
+                    let errorReason = result.validation_details ? 
+                        result.validation_details.reason : 
+                        'No se pudo validar correctamente';
+                    
+                    const reasonElement = document.createElement('p');
+                    reasonElement.style.fontSize = '15px';
+                    reasonElement.style.fontWeight = 'bold';
+                    reasonElement.style.color = '#d63031';
+                    reasonElement.innerHTML = `❌ ${errorReason}`;
+                    errorSection.appendChild(reasonElement);
+                    
+                    // Si hay detalles de la tarjeta, mostrarlos
+                    if (result.card_details) {
+                        const card = result.card_details;
+                        
+                        let fundingType = '';
+                        if (card.funding) {
+                            if (card.funding === 'credit') fundingType = 'Crédito';
+                            else if (card.funding === 'debit') fundingType = 'Débito';
+                            else if (card.funding === 'prepaid') fundingType = 'Prepago';
+                            else fundingType = card.funding;
+                        }
+                        
+                        const cardDetails = document.createElement('div');
+                        cardDetails.className = 'card-display';
+                        
+                        cardDetails.innerHTML = `
+                            <p><strong>💳 Tarjeta:</strong> ${card.brand.toUpperCase()} **** **** **** ${card.last4}</p>
+                            <p><strong>⏱️ Expiración:</strong> ${card.exp_month}/${card.exp_year}</p>
+                            <p><strong>🌎 País:</strong> ${card.country || 'No disponible'} | <strong>Tipo:</strong> ${fundingType || 'No disponible'}</p>
+                        `;
+                        
+                        errorSection.appendChild(cardDetails);
+                    }
+                    
+                    // Añadir la sección de error al contenedor principal
+                    resultContainer.appendChild(errorSection);
+                    statusDiv.appendChild(resultContainer);
+                    
+                    // Añadir más información si está disponible (Setup Intent)
+                    if (result.setup_details) {
+                        addSetupDetails(result.setup_details, statusDiv, result);
+                    }
+                }
+            } catch (error) {
+                console.error("Error during validation:", error);
+                
+                // Limpiar el contenedor para agregar elementos en el orden correcto
+                statusDiv.innerHTML = '';
+                statusDiv.className = 'status';
+                
+                // Crear contenedor principal para los resultados
+                const resultContainer = document.createElement('div');
+                resultContainer.className = 'result-container';
+                
+                // Crear sección principal de error
+                const errorSection = document.createElement('div');
+                errorSection.className = 'result-section error';
+                
+                // Título principal de error
+                const errorTitle = document.createElement('h3');
+                errorTitle.innerHTML = '❌ TARJETA INVÁLIDA';
+                errorSection.appendChild(errorTitle);
+                
+                // Mensaje de razón principal
+                let reasonMessage = error.message || 'Error al procesar la tarjeta';
+                
+                // Mensajes de error mejorados en español
+                const errorMessages = {
+                    'insufficient_funds': '💳 Tu tarjeta no tiene fondos suficientes',
+                    'expired_card': '📅 Esta tarjeta ha expirado. Verifica la fecha',
+                    'incorrect_cvc': '🔒 El código de seguridad es incorrecto',
+                    'rate_limit_exceeded': '⏳ Has hecho muchas consultas. Espera 15 minutos',
+                    'generic_decline': '🚫 Tu banco rechazó la transacción',
+                    'lost_card': '⛔ Esta tarjeta ha sido reportada como perdida',
+                    'stolen_card': '⛔ Esta tarjeta ha sido reportada como robada',
+                    'incorrect_number': '❌ El número de tarjeta es incorrecto',
+                    'invalid_expiry_month': '📅 El mes de expiración no es válido',
+                    'invalid_expiry_year': '📅 El año de expiración no es válido',
+                    'invalid_cvc': '🔒 El código de seguridad no es válido',
+                    'incorrect_zip': '📮 El código postal no coincide',
+                    'card_velocity_exceeded': '⚡ Demasiadas transacciones en poco tiempo',
+                    'withdrawal_count_limit_exceeded': '📊 Límite de retiros excedido',
+                    'currency_not_supported': '💱 Esta tarjeta no acepta USD',
+                    'restricted_card': '🔒 Tu tarjeta tiene restricciones de uso',
+                    'security_violation': '🛡️ Problema de seguridad detectado',
+                    'suspected_fraud': '🚨 Transacción marcada como sospechosa',
+                    'card_not_supported': '❌ Esta tarjeta no es compatible',
+                    'offline_pin_required': '📱 Se requiere PIN offline',
+                    'approval_expired': '⏰ La aprobación ha expirado',
+                    'authentication_required': '🔐 Se requiere autenticación adicional',
+                    'call_issuer': '☎️ Contacta a tu banco emisor',
+                    'pickup_card': '🏦 Tu banco solicita retener la tarjeta',
+                    'test_mode_live_card': '🧪 Error de modo de prueba'
+                };
+                
+                // Si el error tiene más información detallada
+                if (error.decline_code) {
+                    reasonMessage = errorMessages[error.decline_code] || error.message;
+                }
+                
+                const reasonElement = document.createElement('p');
+                reasonElement.style.fontSize = '15px';
+                reasonElement.style.fontWeight = 'bold';
+                reasonElement.style.color = '#d63031';
+                reasonElement.innerHTML = `❌ ${reasonMessage}`;
+                errorSection.appendChild(reasonElement);
+                
+                // Detalles de la tarjeta
+                if (error.card_details) {
+                    const card = error.card_details;
+                    
+                    let fundingType = '';
+                    if (card.funding) {
+                        if (card.funding === 'credit') fundingType = 'Crédito';
+                        else if (card.funding === 'debit') fundingType = 'Débito';
+                        else if (card.funding === 'prepaid') fundingType = 'Prepago';
+                        else fundingType = card.funding;
+                    }
+                    
+                    const cardDetails = document.createElement('div');
+                    cardDetails.className = 'card-display';
+                    
+                    cardDetails.innerHTML = `
+                        <p><strong>💳 Tarjeta:</strong> ${card.brand.toUpperCase()} **** **** **** ${card.last4}</p>
+                        <p><strong>⏱️ Expiración:</strong> ${card.exp_month}/${card.exp_year}</p>
+                        <p><strong>🌎 País:</strong> ${card.country || 'No disponible'} | <strong>Tipo:</strong> ${fundingType || 'No disponible'}</p>
+                    `;
+                    errorSection.appendChild(cardDetails);
+                }
+                
+                // Información técnica
+                const technicalInfo = document.createElement('div');
+                technicalInfo.className = 'tech-details';
+                
+                let infoHTML = '<strong>Información técnica:</strong><ul style="margin: 5px 0 0 0; padding-left: 20px;">';
+                
+                if (error.type) infoHTML += `<li>Tipo de error: ${error.type}</li>`;
+                if (error.code) infoHTML += `<li>Código: ${error.code}</li>`;
+                if (error.decline_code) infoHTML += `<li>Código de rechazo: ${error.decline_code}</li>`;
+                if (error.network_decline_code) infoHTML += `<li>Código de rechazo de red: ${error.network_decline_code}</li>`;
+                if (error.doc_url) infoHTML += `<li><a href="${error.doc_url}" target="_blank" style="color: #3498db;">Documentación</a></li>`;
+                if (error.charge) infoHTML += `<li>ID de Cargo: ${error.charge}</li>`;
+                
+                infoHTML += '</ul>';
+                technicalInfo.innerHTML = infoHTML;
+                errorSection.appendChild(technicalInfo);
+                
+                // Añadir la sección de error al contenedor principal
+                resultContainer.appendChild(errorSection);
+                statusDiv.appendChild(resultContainer);
+            } finally {
+                // Se ejecuta siempre, sin importar si fue exitoso o hubo error
+                if (typeof progressInterval !== 'undefined') {
+                    clearInterval(progressInterval);
+                }
+                submitButton.disabled = false;
+                submitButton.textContent = 'Verificar Tarjeta';
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+{
+  "name": "card-validator",
+  "version": "1.0.0",
+  "description": "Stripe card validator",
+  "main": "index.js",
+  "scripts": {
+    "start": "netlify dev"
+  },
+  "dependencies": {
+    "stripe": "^13.0.0"
+  },
+  "devDependencies": {
+    "netlify-cli": "^12.0.0"
+  }
+}

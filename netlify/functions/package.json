@@ -1,0 +1,13 @@
+{
+  "name": "verify-card-function",
+  "version": "1.0.0",
+  "description": "Stripe card verification function",
+  "main": "verify-card.js",
+  "private": true,
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "dependencies": {
+    "stripe": "^11.18.0"
+  }
+}
